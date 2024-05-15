@@ -42,6 +42,9 @@ PredictRBM <- function(test, labels, model, layers = 2) {
 
   # Create dataframe to save predictions and actual labels
   result.dat <- data.frame('y' = labels, 'y.pred'= rep(0,length(labels)))
+
+  # Creating binarized matrix of all the possible labels and add bias term
+  y <- cbind(1, LabelBinarizer(unique(labels)))
   
   # Name the rows after the possible labels:
   rownames(y) <- unique(labels)
