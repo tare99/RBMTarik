@@ -40,74 +40,66 @@ PredictRBM <- function(test, labels, model, layers = 2) {
     }
   }
 
-  # Create dataframe to save predictions and actual labels
-  result.dat <- data.frame('y' = labels, 'y.pred'= rep(0,length(labels)))
+ result.dat <- data.frame('y' = labels, 'y.pred'= rep(0, length(labels)))
+
+# Assuming binarized_labels contains the labels
+binarized_labels <- LabelBinarizer(unique(labels))
+y <- cbind(1, binarized_labels, rep(0, nrow(binarized_labels)))
+
+rownames(y) <- rownames(binarized_labels)
+
+# Loop over all the test data and calculate model predictions
+for (i in 1:nrow(test)) {
+  # Reset the energy column to 0
+  y[, ncol(y)] <- 0
   
-  # Creating binarized matrix of all the possible labels and add bias term
-  binarized_labels <- LabelBinarizer(unique(labels))
-  y <- cbind(1, binarized_labels)
+  # Initialize visible unit:
+  V <- test[i , , drop = FALSE]
   
-  # Name the rows after the possible labels:
-  rownames(y) <- rownames(binarized_labels)
-  
-  # Add a column to save the energies:
-  y <- cbind(y, rep(0, nrow(y)))
-  
-  # Add bias term to data
-  test <- cbind(1, test)
-  
-  # Loop over all the test data and calculate model predictions
-  for (i in 1:nrow(test)) {
-    y[, ncol(y)] <- 0  # Ensure that the energy column is reset to 0
-    
-    # Initialize visible unit:
-    V <- test[i , , drop = FALSE]
-    
-    # Make the predictions 
-    if (missing(layers)) {
-      for (j in 1:nrow(y)) {
-        
-        # Calculate the hidden units for each class:
-        H <- VisToHid(V, model$trained.weights, y[j, 1:(ncol(y)-1), drop = FALSE], model$trained.y.weights)
-        # Calculate energy for each class:
-        y[j, ncol(y)] <- Energy(V, H, model$trained.weights, y[j, 1:(ncol(y)-1), drop = FALSE], model$trained.y.weights)
-      }
-    } else {
-      if (length(model) != layers) {
-        stop('The model object layers are unequal to the layers defined in the predict function')
-      }
-      for (j in 1:nrow(y)) {
-        # Initialize visible unit:
-        V <- test[i,, drop = FALSE]
-        # Perform a forward pass until the classification RBM
-        for (l in 1:layers){
-          if (l < layers) {
-            V <- VisToHid(V, model[[l]]$trained.weights)
-            # Fix the bias term
-            V[, 1] <- 1
-            
-          } else {
-            # When at last layer, calculate energy for each class
-            H <- VisToHid(V, model[[l]]$trained.weights, y[j, 1:(ncol(y)-1), drop = FALSE], model[[l]]$trained.y.weights)
-            # Save energy with class
-            y[j, ncol(y)] <- Energy(V, H, model[[l]]$trained.weights, y[j, 1:(ncol(y)-1), drop = FALSE], model[[l]]$trained.y.weights)
-          }
+  # Make the predictions 
+  if (missing(layers)) {
+    for (j in 1:nrow(y)) {
+      # Calculate the hidden units for each class:
+      H <- VisToHid(V, model$trained.weights, y[j, 1:(ncol(y)-1), drop = FALSE], model$trained.y.weights)
+      # Calculate energy for each class:
+      y[j, ncol(y)] <- Energy(V, H, model$trained.weights, y[j, 1:(ncol(y)-1), drop = FALSE], model$trained.y.weights)
+    }
+  } else {
+    if (length(model) != layers) {
+      stop('The model object layers are unequal to the layers defined in the predict function')
+    }
+    for (j in 1:nrow(y)) {
+      # Initialize visible unit:
+      V <- test[i,, drop = FALSE]
+      # Perform a forward pass until the classification RBM
+      for (l in 1:layers){
+        if (l < layers) {
+          V <- VisToHid(V, model[[l]]$trained.weights)
+          # Fix the bias term
+          V[, 1] <- 1
+          
+        } else {
+          # When at last layer, calculate energy for each class
+          H <- VisToHid(V, model[[l]]$trained.weights, y[j, 1:(ncol(y)-1), drop = FALSE], model[[l]]$trained.y.weights)
+          # Save energy with class
+          y[j, ncol(y)] <- Energy(V, H, model[[l]]$trained.weights, y[j, 1:(ncol(y)-1), drop = FALSE], model[[l]]$trained.y.weights)
         }
       }
     }
-    # Predict the label with the highest energy
-    result.dat[i,2] <- as.numeric(rownames(y)[y[, ncol(y)] == min(y[, ncol(y)])])
   }
-  
-  # Calculate the accuracy of the classifier
-  acc <- mean(result.dat[, 1] == result.dat[, 2])
-  
-  # make the confusion matrix of the classifier
-  conf <- table('pred' = result.dat[, 2], 'truth' = result.dat[, 1])
-  
-  # Make an output list
-  output <- list('ConfusionMatrix' = conf, 'Accuracy' = acc)
-  
-  # Return list with the confusion matrix and the accuracy
-  return(output)
+  # Predict the label with the highest energy
+  result.dat[i, 2] <- as.numeric(rownames(y)[y[, ncol(y)] == min(y[, ncol(y)])])
+}
+
+# Calculate the accuracy of the classifier
+acc <- mean(result.dat[, 1] == result.dat[, 2])
+
+# Make the confusion matrix of the classifier
+conf <- table('pred' = result.dat[, 2], 'truth' = result.dat[, 1])
+
+# Make an output list
+output <- list('ConfusionMatrix' = conf, 'Accuracy' = acc)
+
+# Return list with the confusion matrix and the accuracy
+return(output)
 }
