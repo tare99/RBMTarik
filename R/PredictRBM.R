@@ -42,25 +42,24 @@ PredictRBM <- function(test, labels, model, layers = 2) {
 
   # Create dataframe to save predictions and actual labels
   result.dat <- data.frame('y' = labels, 'y.pred'= rep(0,length(labels)))
-
+  
   # Creating binarized matrix of all the possible labels and add bias term
-  y <- cbind(1, LabelBinarizer(unique(labels)))
-
-# For a matrix
-num_columns_y <- ncol(y)
-
+  binarized_labels <- LabelBinarizer(unique(labels))
+  y <- cbind(1, binarized_labels)
+  
   # Name the rows after the possible labels:
-  rownames(y) <- unique(labels)
+  rownames(y) <- rownames(binarized_labels)
   
   # Add a column to save the energies:
-  y <- cbind(y,rep(0,nrow(y)))
+  y <- cbind(y, rep(0, nrow(y)))
   
   # Add bias term to data
   test <- cbind(1, test)
   
   # Loop over all the test data and calculate model predictions
   for (i in 1:nrow(test)) {
-    y[,num_columns_y] <- 0
+    y[, ncol(y)] <- 0  # Ensure that the energy column is reset to 0
+    
     # Initialize visible unit:
     V <- test[i , , drop = FALSE]
     
@@ -69,9 +68,9 @@ num_columns_y <- ncol(y)
       for (j in 1:nrow(y)) {
         
         # Calculate the hidden units for each class:
-        H <- VisToHid(V, model$trained.weights, y[j, 1:num_columns_y-1, drop = FALSE], model$trained.y.weights)
+        H <- VisToHid(V, model$trained.weights, y[j, 1:(ncol(y)-1), drop = FALSE], model$trained.y.weights)
         # Calculate energy for each class:
-        y[j,num_columns_y] <- Energy(V, H, model$trained.weights, y[j, 1:num_columns_y-1, drop = FALSE], model$trained.y.weights)
+        y[j, ncol(y)] <- Energy(V, H, model$trained.weights, y[j, 1:(ncol(y)-1), drop = FALSE], model$trained.y.weights)
       }
     } else {
       if (length(model) != layers) {
@@ -80,7 +79,7 @@ num_columns_y <- ncol(y)
       for (j in 1:nrow(y)) {
         # Initialize visible unit:
         V <- test[i,, drop = FALSE]
-        # Perform a forward pass untill the classification RBM
+        # Perform a forward pass until the classification RBM
         for (l in 1:layers){
           if (l < layers) {
             V <- VisToHid(V, model[[l]]$trained.weights)
@@ -89,15 +88,15 @@ num_columns_y <- ncol(y)
             
           } else {
             # When at last layer, calculate energy for each class
-            H <- VisToHid(V, model[[l]]$trained.weights, y[j, 1:num_columns_y-1, drop = FALSE], model[[l]]$trained.y.weights)
+            H <- VisToHid(V, model[[l]]$trained.weights, y[j, 1:(ncol(y)-1), drop = FALSE], model[[l]]$trained.y.weights)
             # Save energy with class
-            y[j, num_columns_y] <- Energy(V, H, model[[l]]$trained.weights, y[j, 1:num_columns_y-1, drop = FALSE], model[[l]]$trained.y.weights)
+            y[j, ncol(y)] <- Energy(V, H, model[[l]]$trained.weights, y[j, 1:(ncol(y)-1), drop = FALSE], model[[l]]$trained.y.weights)
           }
         }
       }
     }
     # Predict the label with the highest energy
-    result.dat[i,2] <- as.numeric(rownames(y)[y[, num_columns_y] == min(y[, num_columns_y])])
+    result.dat[i,2] <- as.numeric(rownames(y)[y[, ncol(y)] == min(y[, ncol(y)])])
   }
   
   # Calculate the accuracy of the classifier
